@@ -21,17 +21,29 @@
             border-radius: 10px;
             box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
         }
+        .error-box {
+            padding: 10px;
+            background: #ffdddd;
+            color: #b30000;
+            border-left: 5px solid red;
+            border-radius: 5px;
+            display: none;
+        }
     </style>
 </head>
 
 <body style="background:#f5f7fa;">
 
-<!-- NAVBAR WITH LOGO Hum aur Code-->
+<!-- MARQUEE -->
+<marquee behavior="scroll" direction="left" style="background:#0d6efd;color:white;padding:8px;font-weight:bold;">
+    This project is created by Abhishek Sandip Varpe | Studied at Pravara Rural Engineering College, Pravaranagar
+</marquee>
+
+<!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center" href="#">
-            <img src="/images/logo.png"
-                 width="40" class="me-2">
+            <img src="/images/logo.png" width="40" class="me-2">
             <span class="logo-text">WebScraper</span>
         </a>
     </div>
@@ -43,10 +55,13 @@
 
         <h2 class="text-center mb-4 text-primary">Web Content Extractor</h2>
 
-        <input type="text" id="urlInput" class="form-control"
-               placeholder="Enter website URL">
+        <!-- Error Box -->
+        <div id="errorBox" class="error-box"></div>
 
-        <button onclick="scrape()"
+        <input type="text" id="urlInput" class="form-control"
+               placeholder="Enter website URL (example: https://example.com)">
+
+        <button onclick="scrape()" id="scrapeBtn"
                 class="btn btn-primary w-100 mt-3">
             Scrape Website
         </button>
@@ -66,28 +81,75 @@
 </div>
 
 <script>
+    function showError(msg) {
+        const box = document.getElementById("errorBox");
+        box.style.display = "block";
+        box.innerText = msg;
+    }
+
+    function hideError() {
+        document.getElementById("errorBox").style.display = "none";
+    }
+
+    function validateURL(url) {
+        const pattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+/;
+        return pattern.test(url);
+    }
+
     function scrape() {
 
-        let url = document.getElementById("urlInput").value;
+        hideError();
+
+        let url = document.getElementById("urlInput").value.trim();
+
+        // URL validation
+        if (!url) {
+            showError("Please enter a URL.");
+            return;
+        }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "https://" + url;
+        }
+        if (!validateURL(url)) {
+            showError("Invalid URL! Please enter a valid website link.");
+            return;
+        }
+
+        // Loading UI
+        const btn = document.getElementById("scrapeBtn");
+        btn.innerHTML = "Scraping... Please wait ⏳";
+        btn.disabled = true;
 
         fetch(`/api/scrape?url=${encodeURIComponent(url)}`)
             .then(res => res.json())
             .then(data => {
 
+                // Images
                 document.getElementById("images").innerHTML =
                     data.images.map(img =>
                         `<img src="${img}" width="120" class="m-2">`
                     ).join("");
 
+                // Links
                 document.getElementById("links").innerHTML =
                     data.links.map(link =>
                         `<p><a href="${link}" target="_blank">${link}</a></p>`
                     ).join("");
 
+                // Videos
                 document.getElementById("videos").innerHTML =
                     data.videos.map(v =>
                         `<video src="${v}" width="250" controls class="m-2"></video>`
                     ).join("");
+
+            })
+            .catch(err => {
+                showError("Failed to fetch data from API.");
+                console.error(err);
+            })
+            .finally(() => {
+                btn.innerHTML = "Scrape Website";
+                btn.disabled = false;
             });
     }
 </script>
