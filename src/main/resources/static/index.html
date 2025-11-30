@@ -1,157 +1,396 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8" />
     <title>Web Content Extractor</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 
     <style>
-        .logo-text {
-            font-size: 22px;
-            font-weight: bold;
-            color: white;
+        /* === Color variables for light/dark themes === */
+        :root{
+            --bg:#f5f7fa;
+            --card-bg:#ffffff;
+            --text:#212529;
+            --muted:#6c757d;
+            --box:#f8f9fa;
+            --shadow: 0px 4px 15px rgba(0,0,0,0.1);
         }
-        .content-box {
-            background: #ffffff;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
+        [data-theme="dark"]{
+            --bg:#0b1220;
+            --card-bg:#0f1724;
+            --text:#e6eef8;
+            --muted:#9aa7bb;
+            --box:#0b1116;
+            --shadow: 0px 6px 20px rgba(0,0,0,0.6);
         }
-        img, video {
-            border-radius: 10px;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
-        }
-        .error-box {
-            padding: 10px;
-            background: #ffdddd;
-            color: #b30000;
-            border-left: 5px solid red;
-            border-radius: 5px;
+
+        body { background:var(--bg); color:var(--text); }
+        .logo-text { font-size: 22px; font-weight: bold; color: white; }
+        .content-box { background: var(--card-bg); padding: 25px; border-radius: 12px;
+                       box-shadow: var(--shadow); }
+        img, video { border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.15); }
+        .spinner-border { width: 1.25rem; height: 1.25rem; }
+        .small-muted { font-size: 0.9rem; color: var(--muted); }
+        .placeholder-box { padding: 18px; border-radius: 8px; background:var(--box); text-align:center; color:var(--muted); }
+        pre#rawJson { max-height: 220px; overflow:auto; background:#f1f3f5; padding:12px; border-radius:6px; color:var(--text); }
+
+        /* error box */
+        .alert-danger { background: #ffdddd; color: #b30000; border-left: 5px solid red; }
+
+        /* Scroll to top button */
+        #scrollTopBtn {
+            position: fixed;
+            bottom: 22px;
+            right: 22px;
+            z-index: 9999;
             display: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            padding: 8px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+        }
+
+        /* Dark-mode safe overrides for pre */
+        [data-theme="dark"] pre#rawJson { background:#07101a; color:#cfe9ff; }
+
+        /* small responsive tweaks */
+        @media (max-width:576px){
+            .logo-text { font-size: 18px; }
         }
     </style>
 </head>
 
-<body style="background:#f5f7fa;">
+<body>
 
-<!-- MARQUEE -->
+<!-- === Marquee: credit === -->
 <marquee behavior="scroll" direction="left" style="background:#0d6efd;color:white;padding:8px;font-weight:bold;">
     This project is created by Abhishek Sandip Varpe | Studied at Pravara Rural Engineering College, Pravaranagar
 </marquee>
 
-<!-- NAVBAR -->
+<!-- NAVBAR WITH DARK MODE TOGGLE -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
     <div class="container">
         <a class="navbar-brand d-flex align-items-center" href="#">
-            <img src="/images/logo.png" width="40" class="me-2">
+            <img src="/images/logo.png" width="40" class="me-2" alt="logo">
             <span class="logo-text">WebScraper</span>
         </a>
+
+        <!-- Right side controls -->
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <div class="form-check form-switch text-white me-2">
+                <input class="form-check-input" type="checkbox" id="darkModeToggle" />
+                <label class="form-check-label small" for="darkModeToggle" style="color:white;">Dark Mode</label>
+            </div>
+        </div>
     </div>
 </nav>
 
-<!-- MAIN CONTENT BOX -->
+<!-- MAIN CONTENT -->
 <div class="container mt-5">
     <div class="content-box">
 
-        <h2 class="text-center mb-4 text-primary">Web Content Extractor</h2>
+        <h2 class="text-center mb-3 text-primary">Web Content Extractor</h2>
 
-        <!-- Error Box -->
-        <div id="errorBox" class="error-box"></div>
+        <div class="row g-2">
+            <div class="col-md-9">
+                <input type="text" id="urlInput" class="form-control"
+                       placeholder="Enter website URL (e.g. example.com or https://example.com)">
+                <div class="small-muted mt-1">Tip: If you omit protocol, <code>https://</code> will be used.</div>
+            </div>
 
-        <input type="text" id="urlInput" class="form-control"
-               placeholder="Enter website URL (example: https://example.com)">
+            <div class="col-md-3 d-grid">
+                <button id="scrapeBtn" class="btn btn-primary" onclick="scrape()">
+                    <span id="btnText">Scrape Website</span>
+                    <span id="btnSpinner" class="d-none ms-2">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
 
-        <button onclick="scrape()" id="scrapeBtn"
-                class="btn btn-primary w-100 mt-3">
-            Scrape Website
-        </button>
+        <div id="controls" class="mt-3 d-flex gap-2" style="display:none;">
+            <button id="downloadImagesBtn" class="btn btn-outline-success btn-sm" onclick="downloadAllImages()" disabled>Download all images</button>
+            <button id="copyLinksBtn" class="btn btn-outline-secondary btn-sm" onclick="copyLinks()" disabled>Copy links</button>
+            <button id="clearBtn" class="btn btn-outline-danger btn-sm" onclick="clearResults()">Clear</button>
+            <div class="ms-auto small-muted align-self-center">Results from backend: <code>/api/scrape?url=...</code></div>
+        </div>
 
         <hr class="mt-4">
 
-        <h4>Images</h4>
-        <div id="images" class="d-flex flex-wrap"></div>
+        <div id="errorBox" class="alert alert-danger d-none" role="alert"></div>
 
-        <h4 class="mt-4">Links</h4>
-        <div id="links"></div>
+        <div class="row">
+            <div class="col-lg-6">
+                <h5>Images</h5>
+                <div id="images" class="d-flex flex-wrap gap-2 min-vh-25">
+                    <div class="placeholder-box w-100">No images yet</div>
+                </div>
+            </div>
 
-        <h4 class="mt-4">Videos</h4>
-        <div id="videos"></div>
+            <div class="col-lg-6">
+                <h5>Links</h5>
+                <div id="links" class="mb-3">
+                    <div class="placeholder-box">No links yet</div>
+                </div>
+
+                <h5 class="mt-3">Videos</h5>
+                <div id="videos">
+                    <div class="placeholder-box">No videos yet</div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="mt-4">
+        <h6>Raw JSON Response (debug)</h6>
+        <pre id="rawJson">—</pre>
 
     </div>
 </div>
 
+<!-- Scroll to top button -->
+<button id="scrollTopBtn" class="btn btn-primary" title="Scroll to top" onclick="scrollToTop()">
+    ↑
+</button>
+
 <script>
+    // ======= Theme (dark mode) handling =======
+    const themeKey = 'webscraper_theme';
+
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.getElementById('darkModeToggle').checked = true;
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            document.getElementById('darkModeToggle').checked = false;
+        }
+    }
+
+    // load saved preference
+    (function initTheme(){
+        const saved = localStorage.getItem(themeKey) || 'light';
+        applyTheme(saved);
+    })();
+
+    document.getElementById('darkModeToggle').addEventListener('change', function(e){
+        const theme = e.target.checked ? 'dark' : 'light';
+        applyTheme(theme);
+        localStorage.setItem(themeKey, theme);
+    });
+
+    // ======= Scroll to top button logic =======
+    const scrollBtn = document.getElementById('scrollTopBtn');
+    window.addEventListener('scroll', () => {
+        if (document.documentElement.scrollTop > 300 || document.body.scrollTop > 300) {
+            scrollBtn.style.display = 'block';
+        } else {
+            scrollBtn.style.display = 'none';
+        }
+    });
+
+    function scrollToTop() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ======= Your original app JS (kept intact) =======
+    // Utility: ensure URL has protocol
+    function normalizeUrl(input) {
+        if (!input) return null;
+        input = input.trim();
+        // if looks like localhost or domain without protocol
+        if (!/^https?:\/\//i.test(input)) {
+            input = 'https://' + input;
+        }
+        try {
+            new URL(input); // validate
+            return input;
+        } catch (e) {
+            return null;
+        }
+    }
+
     function showError(msg) {
-        const box = document.getElementById("errorBox");
-        box.style.display = "block";
-        box.innerText = msg;
+        const box = document.getElementById('errorBox');
+        box.textContent = msg;
+        box.classList.remove('d-none');
     }
-
     function hideError() {
-        document.getElementById("errorBox").style.display = "none";
+        document.getElementById('errorBox').classList.add('d-none');
     }
 
-    function validateURL(url) {
-        const pattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+/;
-        return pattern.test(url);
+    function setLoading(loading) {
+        const btn = document.getElementById('scrapeBtn');
+        const spinner = document.getElementById('btnSpinner');
+        const btnText = document.getElementById('btnText');
+        if (loading) {
+            btn.setAttribute('disabled', 'true');
+            spinner.classList.remove('d-none');
+            btnText.textContent = 'Scraping...';
+        } else {
+            btn.removeAttribute('disabled');
+            spinner.classList.add('d-none');
+            btnText.textContent = 'Scrape Website';
+        }
     }
 
-    function scrape() {
-
+    async function scrape() {
         hideError();
-
-        let url = document.getElementById("urlInput").value.trim();
-
-        // URL validation
+        const raw = document.getElementById('urlInput').value;
+        const url = normalizeUrl(raw);
         if (!url) {
-            showError("Please enter a URL.");
-            return;
-        }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            url = "https://" + url;
-        }
-        if (!validateURL(url)) {
-            showError("Invalid URL! Please enter a valid website link.");
+            showError('Please enter a valid URL.');
             return;
         }
 
-        // Loading UI
-        const btn = document.getElementById("scrapeBtn");
-        btn.innerHTML = "Scraping... Please wait ⏳";
-        btn.disabled = true;
+        setLoading(true);
+        document.getElementById('controls').style.display = 'none';
+        document.getElementById('rawJson').textContent = 'Loading...';
 
-        fetch(`/api/scrape?url=${encodeURIComponent(url)}`)
-            .then(res => res.json())
-            .then(data => {
+        try {
+            // Fetch backend endpoint (matches your controller)
+            const res = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`, { method: 'GET' });
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`Server responded ${res.status}: ${txt || res.statusText}`);
+            }
+            const data = await res.json();
 
-                // Images
-                document.getElementById("images").innerHTML =
-                    data.images.map(img =>
-                        `<img src="${img}" width="120" class="m-2">`
-                    ).join("");
+            // Update raw JSON
+            document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
 
-                // Links
-                document.getElementById("links").innerHTML =
-                    data.links.map(link =>
-                        `<p><a href="${link}" target="_blank">${link}</a></p>`
-                    ).join("");
+            renderImages(data.images || []);
+            renderLinks(data.links || []);
+            renderVideos(data.videos || []);
 
-                // Videos
-                document.getElementById("videos").innerHTML =
-                    data.videos.map(v =>
-                        `<video src="${v}" width="250" controls class="m-2"></video>`
-                    ).join("");
+            // show controls if any results
+            const any = (data.images && data.images.length) || (data.links && data.links.length) || (data.videos && data.videos.length);
+            document.getElementById('controls').style.display = any ? 'flex' : 'none';
+            document.getElementById('downloadImagesBtn').disabled = !(data.images && data.images.length);
+            document.getElementById('copyLinksBtn').disabled = !(data.links && data.links.length);
 
-            })
-            .catch(err => {
-                showError("Failed to fetch data from API.");
-                console.error(err);
-            })
-            .finally(() => {
-                btn.innerHTML = "Scrape Website";
-                btn.disabled = false;
-            });
+        } catch (err) {
+            console.error(err);
+            showError('Scrape failed: ' + (err.message || err));
+            document.getElementById('rawJson').textContent = 'Error — see message above';
+        } finally {
+            setLoading(false);
+        }
     }
+
+    function renderImages(imgs) {
+        const container = document.getElementById('images');
+        if (!imgs.length) {
+            container.innerHTML = `<div class="placeholder-box w-100">No images found</div>`;
+            return;
+        }
+        container.innerHTML = imgs.map((src, i) =>
+            `<div class="position-relative">
+                <img loading="lazy" src="${escapeHtml(src)}" width="140" height="100" alt="image-${i}" class="m-1" onerror="this.style.opacity=0.6; this.alt='failed to load'">
+                <div class="text-center small-muted mt-1" style="max-width:140px; word-break:break-word;">${shorten(src)}</div>
+            </div>`
+        ).join('');
+    }
+
+    function renderLinks(links) {
+        const container = document.getElementById('links');
+        if (!links.length) {
+            container.innerHTML = `<div class="placeholder-box">No links found</div>`;
+            return;
+        }
+        container.innerHTML = links.map(h => `<p class="mb-1"><a href="${escapeHtml(h)}" target="_blank" rel="noopener noreferrer">${escapeHtml(h)}</a></p>`).join('');
+    }
+
+    function renderVideos(videos) {
+        const container = document.getElementById('videos');
+        if (!videos.length) {
+            container.innerHTML = `<div class="placeholder-box">No videos found</div>`;
+            return;
+        }
+        container.innerHTML = videos.map(v =>
+            `<video src="${escapeHtml(v)}" width="260" controls class="m-1" onerror="this.style.display='none'"></video>`
+        ).join('');
+    }
+
+    // Very small helper to shorten long urls for captions
+    function shorten(s) {
+        if (!s) return '';
+        return s.length > 45 ? s.slice(0,36) + '…' + s.slice(-8) : s;
+    }
+
+    // basic html escape to avoid injection
+    function escapeHtml(str) {
+        return String(str)
+            .replaceAll('&','&amp;')
+            .replaceAll('<','&lt;')
+            .replaceAll('>','&gt;')
+            .replaceAll('"','&quot;')
+            .replaceAll("'",'&#39;');
+    }
+
+    // Copy links to clipboard
+    async function copyLinks() {
+        const links = Array.from(document.querySelectorAll('#links a')).map(a => a.href);
+        if (!links.length) return;
+        try {
+            await navigator.clipboard.writeText(links.join('\n'));
+            alert('Links copied to clipboard (' + links.length + ')');
+        } catch (e) {
+            alert('Failed to copy links: ' + e.message);
+        }
+    }
+
+    // Attempt to download all images by creating anchors with download attribute.
+    // Note: Many servers block cross-origin download; if that happens, user can open images in new tabs.
+    function downloadAllImages() {
+        const imgs = Array.from(document.querySelectorAll('#images img')).map(i => i.src).filter(Boolean);
+        if (!imgs.length) {
+            alert('No images to download.');
+            return;
+        }
+
+        let count = 0;
+        imgs.forEach(src => {
+            // create anchor and click
+            const a = document.createElement('a');
+            a.href = src;
+            // create filename from url
+            try {
+                const urlObj = new URL(src);
+                const filename = urlObj.pathname.split('/').pop() || 'image';
+                a.download = filename;
+            } catch (e) {
+                a.download = 'image';
+            }
+            // open in new tab if download blocked
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            try {
+                a.click();
+                count++;
+            } catch (e) {
+                window.open(src, '_blank', 'noopener');
+            }
+            a.remove();
+        });
+        if (count) alert(`Triggered download for ${count} image(s). If some downloads failed, the server may block cross-origin downloads.`);
+    }
+
+    function clearResults() {
+        document.getElementById('images').innerHTML = `<div class="placeholder-box w-100">No images yet</div>`;
+        document.getElementById('links').innerHTML = `<div class="placeholder-box">No links yet</div>`;
+        document.getElementById('videos').innerHTML = `<div class="placeholder-box">No videos yet</div>`;
+        document.getElementById('rawJson').textContent = '—';
+        document.getElementById('controls').style.display = 'none';
+        hideError();
+    }
+
+    // Initialize
+    (function init(){
+        clearResults();
+    })();
 </script>
 
 </body>
